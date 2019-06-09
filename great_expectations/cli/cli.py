@@ -132,7 +132,7 @@ validate the data.
 @click.option('--target_directory', '-d', default="./",
               help='The root of the project directory where you want to initialize Great Expectations.')
 def init(target_directory):
-    """Initialze a new Great Expectations project.
+    """Initialize a new Great Expectations project.
 
     This guided input walks the user through setting up a project.
 
@@ -169,11 +169,10 @@ OK to proceed?
     """
 
     msg_prompt_choose_data_source = """
-Configure a data source
-    1. Pandas data frames from local filesystem (CSV files)
+Configure a DataSource?
+    1. Directory on your local filesystem
     2. Relational database (SQL)
-    3. Spark DataFrames from local filesystem (CSV files)
-    4. None of the above
+    0. Skip this step for now
     """
 
 #     msg_prompt_choose_data_source = """
@@ -199,8 +198,9 @@ Configure a data source
 #     """
 
     msg_prompt_filesys_enter_base_path = """
-Enter the path of the root directory where the data files are stored 
-(the path may be either absolute or relative to current directory)          
+Please enter the path to the target directory.
+The path may be either absolute (/Users/charles/my_data)
+or relative to the project root directory (my_project_data)
     """
 
     msg_filesys_go_to_notebook = """
@@ -225,7 +225,7 @@ Please make sure that you have it installed.
 
 Next, we will configure database credentials and store them in the "{0:s}" section
 of this config file: great_expectations/uncommitted/credentials/profiles.yml:
-     """
+"""
 
     msg_sqlalchemy_go_to_notebook = """
 To create expectations for your SQL queries start Jupyter and open notebook 
