@@ -80,7 +80,7 @@ def scaffold_directories_and_notebooks(base_dir):
     for directory in [notebook_dir_name, "expectations", "datasources", "uncommitted", "plugins", "fixtures"]:
         safe_mmkdir(os.path.join(base_dir, directory), exist_ok=True)
 
-    for uncommitted_directory in ["validations", "credentials", "samples"]:
+    for uncommitted_directory in ["validations", "credentials", "samples", "docs"]:
         safe_mmkdir(os.path.join(base_dir, "uncommitted",
                                  uncommitted_directory), exist_ok=True)
 

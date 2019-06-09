@@ -1,6 +1,9 @@
 import click
 from .supporting_methods import cli_message
 
+from great_expectations.render.renderer import DescriptivePageRenderer
+from great_expectations.render.view import DescriptivePageView
+
 
 def render_everything(context):
 
@@ -13,8 +16,15 @@ def render_everything(context):
     cli_message("Rendering expectations to documents...")
 
     for asset in named_data_assets:
-        print(asset)
+        # print(asset)
         batch = context.get_batch("data__local_dir", asset)
-        expectations = context.get_expectations(assets)
+        expectations = context.get_expectations(asset)
+
+        evrs = batch.validate(expectations)
+        document = DescriptivePageRenderer.render(evrs)
+        result = DescriptivePageView.render(document)
+        open("great_expectations/uncommitted/docs/%s.html" % asset, 'w').write(
+            result
+        )
     #     batch.autoinspect(ge.dataset.autoinspect.pseudo_pandas_profiling)
     #     batch.save_expectations()
