@@ -967,7 +967,7 @@ If you wish to change this behavior, please set discard_failed_expectations, dis
         if self._batch_kwargs is not None:
             result["meta"].update({"batch_kwargs": self._batch_kwargs})
 
-        if data_context is not None:
+        if data_context is not None and run_id is not None:
             result = data_context.register_validation_results(run_id, result, self)
 
         self._data_context = validate__data_context
