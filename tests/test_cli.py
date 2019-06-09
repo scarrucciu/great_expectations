@@ -173,7 +173,7 @@ def test_cli_init(tmp_path_factory):
     curdir = os.path.abspath(os.getcwd())
     os.chdir(basedir)
     runner = CliRunner()
-    result = runner.invoke(cli, ["init"], input="Y\n1\n%s\n\n" % str(
+    result = runner.invoke(cli, ["init"], input="Y\n1\n%s\n\nY\nY\n" % str(
         os.path.join(basedir, "data")))
 
     print(result.output)

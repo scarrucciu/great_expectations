@@ -1,5 +1,11 @@
 # -*- coding: utf-8 -*-
 
+from great_expectations.render.view import DescriptivePageView
+from great_expectations.render.renderer import DescriptivePageRenderer, PrescriptivePageRenderer
+from great_expectations.data_context import DataContext
+from great_expectations.data_asset import FileDataAsset
+from great_expectations.dataset import Dataset, PandasDataset
+from great_expectations import __version__, read_csv
 import click
 import six
 import os
@@ -20,19 +26,18 @@ from .init import (
 )
 from .datasource import (
     connect_to_datasource,
-    msg_prompt_choose_data_source,
-    msg_prompt_filesys_enter_base_path,
-    msg_prompt_datasource_name,
-    msg_unknown_data_source,
+    # msg_prompt_choose_data_source,
+    # msg_prompt_filesys_enter_base_path,
+    # msg_prompt_datasource_name,
+    # msg_unknown_data_source,
+)
+from .profile import (
+    profile_everything
+)
+from .render import (
+    render_everything
 )
 
-from great_expectations import __version__, read_csv
-from great_expectations.dataset import Dataset, PandasDataset
-from great_expectations.data_asset import FileDataAsset
-from great_expectations.data_context import DataContext
-
-from great_expectations.render.renderer import DescriptivePageRenderer, PrescriptivePageRenderer
-from great_expectations.render.view import DescriptivePageView
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +160,17 @@ def init(target_directory):
     context = DataContext('.')
 
     connect_to_datasource(context)
+
+    if not click.confirm("\nProfile data sources?", default=True):
+        cli_message("Okay. Skipping for now.")
+    else:
+        profile_everything(context)
+
+        if not click.confirm("\nRender expectations to documentation?", default=True):
+            cli_message("Okay. Skipping for now.")
+        else:
+            render_everything(context)
+
     cli_message(msg_filesys_go_to_notebook)
 
 
