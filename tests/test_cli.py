@@ -33,7 +33,7 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  init      Initialze a new Great Expectations project.
+  init      Initialize a new Great Expectations project.
   render    Render a great expectations object.
   validate  Validate a CSV file against an expectations configuration.
 """
@@ -178,7 +178,7 @@ def test_cli_init(tmp_path_factory):
 
     print(result.output)
 
-    assert """Welcome to Great Expectations! Always know what to expect from your data.""" in result.output
+    assert """Always know what to expect from your data.""" in result.output
 
     assert os.path.isdir(os.path.join(basedir, "great_expectations"))
     assert os.path.isfile(os.path.join(
