@@ -273,7 +273,7 @@ To launch with jupyter lab:
 
     # Shows a list of options to select from
 
-    data_source_selection = click.prompt(msg_prompt_choose_data_source, type=click.Choice(["1", "2", "3", "4"]),
+    data_source_selection = click.prompt(msg_prompt_choose_data_source, type=click.Choice(["1", "2", "0"]),
                                          show_choices=False)
 
     print(data_source_selection)
@@ -334,15 +334,15 @@ To launch with jupyter lab:
             data_source_name, "sqlalchemy", profile=data_source_name)
 
     elif data_source_selection == "1":  # csv
-        path = click.prompt(msg_prompt_filesys_enter_base_path, default='/data/', type=click.Path(exists=False,
-                                                                                                  file_okay=False,
-                                                                                                  dir_okay=True,
-                                                                                                  readable=True),
+        path = click.prompt(msg_prompt_filesys_enter_base_path, type=click.Path(exists=False,
+                                                                                file_okay=False,
+                                                                                dir_okay=True,
+                                                                                readable=True),
                             show_default=True)
         if path.startswith("./"):
             path = path[2:]
 
-        default_data_source_name = os.path.basename(path)
+        default_data_source_name = os.path.basename(path)+"__local_dir"
         data_source_name = click.prompt(
             msg_prompt_datasource_name, default=default_data_source_name, show_default=True)
 
