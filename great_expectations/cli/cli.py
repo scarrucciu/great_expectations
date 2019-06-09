@@ -49,9 +49,6 @@ def cli_message(string, color=None, font="big", figlet=False):
                     colored("\g<1>", "blue"),
                     string
                 )
-                # mod_string = string.replace(
-                #     "\<clickable\>.*?\</clickable\>", colored("test", "red")
-                # )
                 six.print_(mod_string)
         else:
             if color:
