@@ -7,6 +7,9 @@ import pytest
 from great_expectations.dataset import MetaSqlAlchemyDataset, SqlAlchemyDataset
 import sqlalchemy as sa
 import pandas as pd
+import pyhive
+import sqlalchemy_redshift
+import snowflake
 from ..test_utils import get_dataset
 
 
@@ -121,11 +124,16 @@ def test_sqlalchemydataset_raises_error_on_missing_table_name():
 
 def test_sqlalchemydataset_builds_guid_for_table_name_on_custom_sql():
     engine = sa.create_engine('sqlite://')
-    with mock.patch("uuid.uuid4") as mock_uuid:
-        mock_uuid.return_value = "a-guid-with-dashes-that-will-break-sql"
+
+    with mock.patch(
+            "great_expectations.dataset.sqlalchemy_dataset.generate_random_temporary_table_name"
+    ) as mock_table_name_gen:
+        mock_table_name_gen.return_value = "a_guid_with_expected_format"
 
         dataset = SqlAlchemyDataset(engine=engine, custom_sql="select 1")
-        assert dataset._table.name =="a_guid_with_dashes_that_will_break_sql"
+
+        # table name comes from generate_random_temporary_table_name
+        assert dataset._table.name == "a_guid_with_expected_format"
 
 
 def test_sqlalchemydataset_with_custom_sql():
@@ -179,6 +187,46 @@ def test_column_fallback():
     # Test a failing expectation
     assert (dataset.expect_table_row_count_to_equal(value=3) == 
             fallback_dataset.expect_table_row_count_to_equal(value=3))
+
+
+DIALECTS = (
+    # dialect name, url to create engine from, loaded dialect
+    ("hive", "hive://host:1234", pyhive.sqlalchemy_hive),
+    ("postgresql", "postgresql://host:1234", sa.dialects.postgresql),
+    ("sqlite", "sqlite://", sa.dialects.sqlite),
+    ("snowflake", "snowflake://host:1234", snowflake.sqlalchemy.snowdialect),
+    ("redshift", "redshift://host:1234", sqlalchemy_redshift.dialect)
+)
+
+
+@pytest.mark.parametrize("dialect_name,url,dialect_type", DIALECTS)
+def test_sqlalchemydataset_dialect_based_on_engine(dialect_name, url, dialect_type):
+    """Tests the dialect name and type are correct based on the engine
+    provided to SqlAlchemyDataset
+    """
+
+    # generate a SQLAlchemy Inspector that does nothing and returns no columns
+    class DummyInspector:
+        def __init__(self):
+            pass
+
+        def get_columns(self, table_name, schema):
+            return []
+
+    with mock.patch('great_expectations.dataset.sqlalchemy_dataset.reflection.Inspector.from_engine') as mock_fe:
+
+        # Inspector creation from engine is patched to return a dummy Inspector
+        mock_fe.return_value = DummyInspector()
+
+        # we are able to initialize an SqlAlchemyDataset with an engine without needing to connect
+        dataset = SqlAlchemyDataset('test_sql_data', engine=sa.create_engine(url))
+
+        # check dialect name is read properly
+        assert dataset.get_dialect_name() == dialect_name
+
+        # check our dialect in use is the desired type
+        assert isinstance(dataset.dialect, type(dialect_type))
+
 
 @pytest.fixture
 def unexpected_count_df():

@@ -1,7 +1,6 @@
 from __future__ import division
 from six import PY3, string_types
 
-import uuid
 from functools import wraps
 import inspect
 import logging
@@ -18,6 +17,7 @@ from .dataset import Dataset
 from .pandas_dataset import PandasDataset
 from great_expectations.data_asset import DataAsset
 from great_expectations.data_asset.util import DocInherit, parse_result_format
+from .util import generate_random_temporary_table_name
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,11 @@ try:
     import snowflake.sqlalchemy.snowdialect
 except ImportError:
     snowflake = None
+    
+try:
+    import pyhive.sqlalchemy_hive
+except ImportError:
+    pyhive_hive = None
 
 
 class MetaSqlAlchemyDataset(Dataset):
@@ -198,8 +203,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                  custom_sql=None, schema=None, *args, **kwargs):
 
         if custom_sql and not table_name:
-            # dashes are special characters in most databases so use undercores
-            table_name = str(uuid.uuid4()).replace("-", "_")
+            table_name = generate_random_temporary_table_name()
 
         if table_name is None:
             raise ValueError("No table_name provided.")
@@ -219,13 +223,15 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                 raise err
 
         # Get the dialect **for purposes of identifying types**
-        if self.engine.dialect.name.lower() in ["postgresql", "mysql", "sqlite", "oracle", "mssql", "oracle"]:
+        if self.get_dialect_name() in ["postgresql", "mysql", "sqlite", "oracle", "mssql", "oracle"]:
             # These are the officially included and supported dialects by sqlalchemy
             self.dialect = import_module("sqlalchemy.dialects." + self.engine.dialect.name)
-        elif self.engine.dialect.name.lower() == "snowflake":
+        elif self.get_dialect_name() == "snowflake":
             self.dialect = import_module("snowflake.sqlalchemy.snowdialect")
-        elif self.engine.dialect.name.lower() == "redshift":
+        elif self.get_dialect_name() == "redshift":
             self.dialect = import_module("sqlalchemy_redshift.dialect")
+        elif self.get_dialect_name() == "hive":
+            self.dialect = import_module("pyhive.sqlalchemy_hive")
         else:
             self.dialect = None
 
@@ -262,6 +268,13 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                 discard_include_config_kwargs=False
             )
         )
+
+    def get_dialect_name(self):
+        # some engines return dialect name as bytes, so everything gets standardized as str
+        # per example on HiveDialect: https://github.com/dropbox/PyHive/blob/master/pyhive/sqlalchemy_hive.py#L231
+        dialect = self.engine.dialect.name
+        dialect_name = dialect.decode('utf-8') if isinstance(dialect, bytes) else dialect
+        return dialect_name.lower()
 
     def get_row_count(self):
         count_query = sa.select([sa.func.count()]).select_from(
@@ -498,8 +511,10 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
         It hasn't been tested in all SQL dialects, and may change based on community feedback.
         :param custom_sql:
         """
-        stmt = "CREATE TEMPORARY TABLE \"{table_name}\" AS {custom_sql}".format(
+
+        stmt = "CREATE TEMPORARY TABLE {table_name} AS {custom_sql}".format(
             table_name=table_name, custom_sql=custom_sql)
+        
         self.engine.execute(stmt)
 
     def column_reflection_fallback(self):
@@ -805,6 +820,13 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
             # Snowflake
             if isinstance(self.engine.dialect, snowflake.sqlalchemy.snowdialect.SnowflakeDialect):
                 return "RLIKE" if positive else "NOT RLIKE"
+        except (AttributeError, TypeError):  # TypeError can occur if the driver was not installed and so is None
+            pass
+        
+        try:
+            # Hive
+            if isinstance(self.engine.dialect, pyhive.sqlalchemy_hive.dialect.HiveDialect):
+                return "REGEXP" if positive else "NOT REGEXP"
         except (AttributeError, TypeError):  # TypeError can occur if the driver was not installed and so is None
             pass
 
