@@ -8,6 +8,7 @@ jsonschema>=2.5.1
 backports.functools_lru_cache>=1.5
 ruamel.yaml>=0.15.24
 ipywidgets>=7.4.2
+urllib3<=1.25,>=1.21
 requests>=2.20
 Click>=7.0
 pyfiglet>=0.8
