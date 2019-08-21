@@ -46,8 +46,9 @@ class DotDict(dict):
 @yaml_object(yaml)
 class RequiredKeysDotDict(DotDict):
     _required_keys = set()
+    _key_types = {}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, coerce_types=False, **kwargs):
         super(RequiredKeysDotDict, self).__init__(*args, **kwargs)
         for key in self._required_keys:
             if key not in self.keys():
@@ -55,24 +56,7 @@ class RequiredKeysDotDict(DotDict):
                     key,
                     self._required_keys
                 ))
-    def __delitem__(self, key):
-        if key in self._required_keys:
-            raise KeyError("key: {!r} cannot be deleted because it's in the required keys: {!r}".format(
-                    key,
-                    self._required_keys
-                ))
-        else:
-            dict.__delitem__(self, key)
 
-    __delattr__ = __delitem__
-
-
-@yaml_object(yaml)
-class RequiredKeysLooselyTypedDotDict(RequiredKeysDotDict):
-    _key_types = {}
-
-    def __init__(self, *args, coerce_types=False, **kwargs):
-        super(RequiredKeysLooselyTypedDotDict, self).__init__(*args, **kwargs)
         for key, value in self.items():
             if key in self._key_types and coerce_types:
                 # Update values if coerce_types==True
@@ -80,7 +64,7 @@ class RequiredKeysLooselyTypedDotDict(RequiredKeysDotDict):
                     # If the given type is an instance of LooselyTypedDotDict, apply coerce_types recursively
                     if isinstance(self._key_types[key], ListOf):
                         if inspect.isclass(self._key_types[key].type_) and issubclass(self._key_types[key].type_,
-                                                                                      RequiredKeysLooselyTypedDotDict):
+                                                                                      RequiredKeysDotDict):
                             value = [self._key_types[key].type_(coerce_types=True, **v) for v in value]
                         else:
                             value = [self._key_types[key].type_(
@@ -88,7 +72,7 @@ class RequiredKeysLooselyTypedDotDict(RequiredKeysDotDict):
 
                     else:
                         if inspect.isclass(self._key_types[key]) and issubclass(self._key_types[key],
-                                                                                RequiredKeysLooselyTypedDotDict):
+                                                                                RequiredKeysDotDict):
                             value = self._key_types[key](coerce_types=True, **value)
                         else:
                             value = self._key_types[key](value)
@@ -107,6 +91,17 @@ class RequiredKeysLooselyTypedDotDict(RequiredKeysDotDict):
         dict.__setitem__(self, key, val)
 
     __setattr__ = __setitem__
+
+    def __delitem__(self, key):
+        if key in self._required_keys:
+            raise KeyError("key: {!r} cannot be deleted because it's in the required keys: {!r}".format(
+                    key,
+                    self._required_keys
+                ))
+        else:
+            dict.__delitem__(self, key)
+
+    __delattr__ = __delitem__
 
     @classmethod
     def _validate_value_type(cls, key, value, type_):
@@ -147,7 +142,7 @@ class RequiredKeysLooselyTypedDotDict(RequiredKeysDotDict):
 
 
 @yaml_object(yaml)
-class LooselyTypedDotDict(RequiredKeysLooselyTypedDotDict):
+class LooselyTypedDotDict(RequiredKeysDotDict):
     """dot.notation access to dictionary attributes, with limited keys
     
 
