@@ -27,8 +27,9 @@ class DotDict(dict):
     def __deepcopy__(self, memo):
         return DotDict([(copy.deepcopy(k, memo), copy.deepcopy(v, memo)) for k, v in self.items()])
 
-    # This is required since our DotDict allows *any* access via dotNotation, blocking the normal
-    # behavior of raising an AttributeError when trying to access a nonexistent function
+    # The following are required to support yaml serialization, since we do not raise
+    # AttributeError from __getattr__ in DotDict. We *do* raise that AttributeError when it is possible to know
+    # a given attribute is not allowed (because it's not in _allowed_keys)
     _yaml_merge = []
 
     @classmethod
