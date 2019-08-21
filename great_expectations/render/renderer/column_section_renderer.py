@@ -380,13 +380,8 @@ class ProfilingResultsColumnSectionRenderer(ColumnSectionRenderer):
         else:
             classes = ["col-4"]
 
-        if any(len(value) > 80 for value in values):
-            content_block_type = "bullet_list"
-        else:
-            content_block_type = "value_list"
-
         new_block = RenderedComponentContent(**{
-            "content_block_type": content_block_type,
+            "content_block_type": "value_list",
             "header":
                 {
                     "template": "Example Values",
@@ -394,20 +389,14 @@ class ProfilingResultsColumnSectionRenderer(ColumnSectionRenderer):
                         "content": "expect_column_values_to_be_in_set"
                     }
                 },
-            content_block_type: [{
-                "content_block_type": "string_template",
-                "string_template": {
-                    "template": "$value",
-                    "params": {
-                        "value": value
-                    },
-                    "styling": {
-                        "default": {
-                            "classes": ["badge", "badge-info"] if content_block_type == "value_list" else [],
-                            "styles": {
-                                "word-break": "break-all"
-                            }
-                        },
+            "value_list": [{
+                "template": "$value",
+                "params": {
+                    "value": value
+                },
+                "styling": {
+                    "default": {
+                        "classes": ["badge", "badge-info"]
                     }
                 }
             } for value in values],
