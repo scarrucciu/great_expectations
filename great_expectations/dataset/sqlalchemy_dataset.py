@@ -37,6 +37,11 @@ try:
 except ImportError:
     snowflake = None
 
+try:
+    import pybigquery.sqlalchemy_bigquery
+except ImportError:
+    snowflake = None
+
 
 class MetaSqlAlchemyDataset(Dataset):
 
@@ -82,7 +87,7 @@ class MetaSqlAlchemyDataset(Dataset):
                 # This only happens on expect_column_values_to_not_be_null expectations.
                 # Since there is no reason to look for most common unexpected values in this case,
                 # we will instruct the result formatting method to skip this step.
-                result_format['partial_unexpected_count'] = 0 
+                result_format['partial_unexpected_count'] = 0
 
             count_query = sa.select([
                 sa.func.count().label('element_count'),
@@ -226,6 +231,8 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
             self.dialect = import_module("snowflake.sqlalchemy.snowdialect")
         elif self.engine.dialect.name.lower() == "redshift":
             self.dialect = import_module("sqlalchemy_redshift.dialect")
+        elif self.engine.dialect.name.lower() == "bigquery":
+            self.dialect = import_module("pybigquery.sqlalchemy_bigquery")
         else:
             self.dialect = None
 
@@ -254,7 +261,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
             pd.read_sql(
                 sa.select(["*"]).select_from(self._table).limit(n),
                 con=self.engine
-            ), 
+            ),
             expectation_suite=self.get_expectation_suite(
                 discard_failed_expectations=False,
                 discard_result_format_kwargs=False,
@@ -309,7 +316,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
             sa.select([sa.func.min(sa.column(column))]).select_from(
                 self._table)
         ).scalar()
-    
+
     def get_column_value_counts(self, column):
         results = self.engine.execute(
             sa.select([
@@ -427,7 +434,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                     )
                 ).label("bin_" + str(len(bins)-1))
             )
-        else:    
+        else:
             case_conditions.append(
                 sa.func.sum(
                     sa.case(
@@ -470,7 +477,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                 max_condition = sa.column(column) < max_val
             else:
                 max_condition = sa.column(column) <= max_val
-        
+
         if min_condition is not None and max_condition is not None:
             condition = sa.and_(min_condition, max_condition)
         elif min_condition is not None:
@@ -488,7 +495,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                     )
                 ) \
                 .select_from(self._table)
-        
+
         return self.engine.execute(query).scalar()
 
     def create_temporary_table(self, table_name, custom_sql):
@@ -578,7 +585,7 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
                     success = issubclass(col_type, getattr(sa, type_))
                 else:
                     success = issubclass(col_type, getattr(self.dialect, type_))
-                
+
             return {
                     "success": success,
                     "result": {
@@ -805,6 +812,13 @@ class SqlAlchemyDataset(MetaSqlAlchemyDataset):
             # Snowflake
             if isinstance(self.engine.dialect, snowflake.sqlalchemy.snowdialect.SnowflakeDialect):
                 return "RLIKE" if positive else "NOT RLIKE"
+        except (AttributeError, TypeError):  # TypeError can occur if the driver was not installed and so is None
+            pass
+
+        try:
+            # Bigquery
+            if isinstance(self.engine.dialect, pybigquery.sqlalchemy_bigquery.BigQueryDialect):
+                return "REGEXP_CONTAINS" if positive else "NOT REGEXP_CONTAINS"
         except (AttributeError, TypeError):  # TypeError can occur if the driver was not installed and so is None
             pass
 
