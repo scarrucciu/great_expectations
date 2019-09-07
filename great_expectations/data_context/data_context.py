@@ -109,7 +109,7 @@ class DataContext(object):
                 template.write(PROJECT_TEMPLATE)
 
         return cls(os.path.join(project_root_dir, "great_expectations"))
-            
+
     def __init__(self, context_root_dir=None, expectation_explorer=False, data_asset_name_delimiter='/'):
         """DataContext constructor
 
@@ -228,7 +228,7 @@ class DataContext(object):
         """Configurable delimiter character used to parse data asset name strings into \
         ``NormalizedDataAssetName`` objects."""
         return self._data_asset_name_delimiter
-    
+
     @data_asset_name_delimiter.setter
     def data_asset_name_delimiter(self, new_delimiter):
         """data_asset_name_delimiter property setter method"""
@@ -274,7 +274,7 @@ class DataContext(object):
                 base_directory,
                 run_id,
                 self._get_normalized_data_asset_name_filepath(
-                    data_asset_name, 
+                    data_asset_name,
                     expectation_suite_name,
                     base_path=""
                 )
@@ -301,8 +301,8 @@ class DataContext(object):
                 all_objects = s3.list_objects(Bucket=bucket)
                 # Remove the key_prefix and first slash from the name
                 validations = [
-                    name[len(key_prefix) + 1:] 
-                    for name in all_objects 
+                    name[len(key_prefix) + 1:]
+                    for name in all_objects
                     if name.startswith(key_prefix) and len(name) > len(key_prefix) + 1
                 ]
                 # run id is the first section after the word "validations"
@@ -323,8 +323,37 @@ class DataContext(object):
             result['bucket'] = bucket
             result['key'] = key
 
+        elif validations_store["type"] == "gcs":
+            # FIXME: this code is untested
+            if "bucket" not in validations_store or "key_prefix" not in validations_store or 'project' not in validations_store :
+                raise DataContextError(
+                    "Invalid validations_store configuration: 'bucket', 'key_prefix' and 'project' are required for an gcs store.")
+
+            try:
+                from google.cloud import storage
+                client = storage.Client(project=validations_store["project"])
+            except ImportError:
+                raise ImportError("google.cloud is required for retrieving a dataset from gcs")
+
+            bucket = validations_store["bucket"]
+            key_prefix = validations_store["key_prefix"]
+
+            key = os.path.join(
+                key_prefix,
+                "validations",
+                run_id,
+                self._get_normalized_data_asset_name_filepath(
+                    data_asset_name,
+                    expectation_suite_name,
+                    base_path=""
+                )
+            )
+
+            result['bucket'] = bucket
+            result['key'] = key
+
         else:
-            raise DataContextError("Invalid validations_store configuration: only 'filesystem' and 's3' are supported.")
+            raise DataContextError("Invalid validations_store configuration: only 'filesystem', 's3' and 'gcs' are supported.")
 
         return result
 
@@ -509,7 +538,7 @@ class DataContext(object):
             if "config_file" in base_datasource_config:
                 defined_config_path = os.path.join(self.root_directory, base_datasource_config.pop("config_file"))
             datasource_config.update(base_datasource_config)
-        
+
         try:
             with open(default_config_path, "r") as config_file:
                 default_path_datasource_config = yaml.load(config_file) or {}
@@ -518,7 +547,7 @@ class DataContext(object):
             if e.errno != errno.ENOENT:
                 raise
             logger.debug("No config file found in default location for datasource %s" % datasource_name)
-        
+
         if defined_config_path is not None:
             try:
                 with open(defined_config_path, "r") as config_file:
@@ -528,7 +557,7 @@ class DataContext(object):
                 if e.errno != errno.ENOENT:
                     raise
                 logger.warning("No config file found in user-defined location for datasource %s" % datasource_name)
-        
+
         return datasource_config
 
     def get_available_data_asset_names(self, datasource_names=None, generator_names=None):
@@ -561,7 +590,7 @@ class DataContext(object):
             raise ValueError(
                 "Datasource names must be a datasource name, list of datasource names or None (to list all datasources)"
             )
-        
+
         if generator_names is not None:
             if isinstance(generator_names, string_types):
                 generator_names = [generator_names]
@@ -659,7 +688,7 @@ class DataContext(object):
                 return PandasDatasource
             except ImportError:
                 raise
- 
+
     def get_datasource(self, datasource_name="default"):
         """Get the named datasource
 
@@ -685,7 +714,7 @@ class DataContext(object):
         datasource = datasource_class(name=datasource_name, data_context=self, **datasource_config)
         self._datasources[datasource_name] = datasource
         return datasource
-            
+
     def _load_evaluation_parameter_store(self):
         """Load the evaluation parameter store to use for managing cross data-asset parameterized expectations.
 
@@ -702,7 +731,7 @@ class DataContext(object):
 
             def get(self, run_id, name):
                 if run_id in self.dict:
-                    return self.dict[run_id][name] 
+                    return self.dict[run_id][name]
                 else:
                     return {}
 
@@ -811,7 +840,7 @@ class DataContext(object):
 
     def _normalize_data_asset_name(self, data_asset_name):
         """Normalizes data_asset_names for a data context.
-        
+
         A data_asset_name is defined per-project and consists of three components that together define a "namespace"
         for data assets, encompassing both expectation suites and batches.
 
@@ -859,7 +888,7 @@ class DataContext(object):
                         delimiter=self.data_asset_name_delimiter
                 )
             )
-        
+
         elif len(split_name) == 1:
             # In this case, the name *must* refer to a unique data_asset_name
             provider_names = set()
@@ -887,7 +916,7 @@ class DataContext(object):
             #         "Ambiguous data_asset_name '{data_asset_name}'. Multiple candidates found: {provider_names}"
             #         .format(data_asset_name=data_asset_name, provider_names=provider_names)
             #     )
-                    
+
             available_names = self.get_available_data_asset_names()
             for datasource in available_names.keys():
                 for generator in available_names[datasource].keys():
@@ -896,7 +925,7 @@ class DataContext(object):
                         provider_names.add(
                             NormalizedDataAssetName(datasource, generator, generator_asset)
                         )
-            
+
             if len(provider_names) == 1:
                 return provider_names.pop()
 
@@ -965,7 +994,7 @@ class DataContext(object):
 
             if len(provider_names) == 1:
                 return provider_names.pop()
-            
+
             elif len(provider_names) > 1:
                 raise DataContextError(
                     "Ambiguous data_asset_name '{data_asset_name}'. Multiple candidates found: {provider_names}"
@@ -1161,6 +1190,32 @@ class DataContext(object):
                     logger.error("Error importing boto3 for AWS support.")
                 except Exception:
                     raise
+            if isinstance(validations_store, dict) and validations_store["type"] == "gcs":
+                bucket = validations_store["bucket"]
+                key_prefix = validations_store["key_prefix"]
+                project = validations_store["project"]
+                key = os.path.join(
+                    key_prefix,
+                    "validations/{run_id}/{data_asset_name}".format(
+                        run_id=run_id,
+                        data_asset_name=self._get_normalized_data_asset_name_filepath(
+                            normalized_data_asset_name,
+                            expectation_suite_name,
+                            base_path=""
+                        )
+                    )
+                )
+                validation_results["meta"]["result_reference"] = "gs://{bucket}/{key}".format(bucket=bucket, key=key)
+                try:
+                    from google.cloud import storage
+                    client = storage.Client(project=project)
+                    bucket_instance = client.get_bucket(bucket)
+                    blob = bucket_instance.blob(key)
+                    blob.upload_from_string(json.dumps(validation_results).encode('utf-8'))
+                except ImportError:
+                    logger.error("Error importing google.cloud for Google Cloud support.")
+                except Exception:
+                    raise
 
         if "result_callback" in self._project_config:
             result_callback = self._project_config["result_callback"]
@@ -1241,13 +1296,13 @@ class DataContext(object):
               expectation_suite_name not in self._compiled_parameters["data_assets"][data_asset_name]):
             # This is fine; short-circuit since we do not need to register any results from this dataset.
             return validation_results
-        
+
         for result in validation_results['results']:
             # Unoptimized: loop over all results and check if each is needed
             expectation_type = result['expectation_config']['expectation_type']
             if expectation_type in self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name]:
                 # First, bind column-style parameters
-                if (("column" in result['expectation_config']['kwargs']) and 
+                if (("column" in result['expectation_config']['kwargs']) and
                     ("columns" in self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_type]) and
                     (result['expectation_config']['kwargs']["column"] in
                      self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_type]["columns"])):
@@ -1264,7 +1319,7 @@ class DataContext(object):
                                 self.store_validation_param(run_id, desired_param, result["result"]["details"])
                             else:
                                 logger.warning("Unrecognized key for parameter %s" % desired_param)
-                
+
                 # Next, bind parameters that do not have column parameter
                 for type_key, desired_parameters in self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_type].items():
                     if type_key == "columns":
@@ -1307,14 +1362,14 @@ class DataContext(object):
 
     def _compile(self):
         """Compiles all current expectation configurations in this context to be ready for result registration.
-        
+
         Compilation only respects parameters with a URN structure beginning with urn:great_expectations:validations
         It splits parameters by the : (colon) character; valid URNs must have one of the following structures to be
         automatically recognized.
 
         "urn" : "great_expectations" : "validations" : data_asset_name : expectation_suite_name : "expectations" : expectation_name : "columns" : column_name : "result": result_key
          [0]            [1]                 [2]              [3]                   [4]                  [5]             [6]              [7]         [8]        [9]        [10]
-        
+
         "urn" : "great_expectations" : "validations" : data_asset_name : expectation_suite_name : "expectations" : expectation_name : "columns" : column_name : "details": details_key
          [0]            [1]                 [2]              [3]                   [4]                  [5]             [6]              [7]         [8]        [9]         [10]
 
@@ -1415,12 +1470,12 @@ class DataContext(object):
                                 if param_key not in self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name]["columns"][column_name]:
                                     self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name]["columns"][column_name][param_key] = set()
                                 self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name]["columns"][column_name][param_key].add(parameter)
-                            
+
                             elif param_key in ["result", "details"]:
                                 if param_key not in self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name]:
                                     self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name][param_key] = set()
                                 self._compiled_parameters["data_assets"][data_asset_name][expectation_suite_name][expectation_name][param_key].add(parameter)
-                            
+
                             else:
                                 logger.warning("Invalid parameter urn (unrecognized structure): %s" % parameter)
 
@@ -1464,6 +1519,8 @@ class DataContext(object):
 
         if resource_store['type'] == "s3":
             raise NotImplementedError("s3 is not currently a supported resource_store type for writing")
+        elif resource_stor['type'] == 'gcs':
+            raise NotImplementedError("gcs is not currently a supported resource_store type for writing")
         elif resource_store['type'] == 'filesystem':
             resource_store = self._normalize_store_path(resource_store)
             path_components = [resource_store['base_directory']]
@@ -1561,6 +1618,8 @@ class DataContext(object):
             return validation_results
         elif validations_store["type"] == "s3":
             raise NotImplementedError("s3 validations_store is not yet supported for listing validation results")
+        elif validations_store["type"] == "gcs":
+            raise NotImplementedError("gcs validations_store is not yet supported for listing validation results")
         else:
             raise DataContextError("unrecognized validations_store type: %s" % validations_store["type"])
 
@@ -1592,20 +1651,20 @@ class DataContext(object):
                 return results_dict
             else:
                 return results_dict
-    
-        elif 'bucket' in validation_location: # s3
+
+        elif validations_store["type"] == "s3":
 
             try:
                 import boto3
                 s3 = boto3.client('s3')
             except ImportError:
                 raise ImportError("boto3 is required for retrieving a dataset from s3")
-        
+
             bucket = validation_location["bucket"]
             key = validation_location["key"]
             s3_response_object = s3.get_object(Bucket=bucket, Key=key)
             object_content = s3_response_object['Body'].read()
-            
+
             results_dict = json.loads(object_content)
 
             if failed_only:
@@ -1614,6 +1673,30 @@ class DataContext(object):
                 return results_dict
             else:
                 return results_dict
+
+        elif validations_store["type"] == "gcs":
+
+            try:
+                from google.cloud import storage
+                client = storage.Client(project=validations_store["project"])
+            except ImportError:
+                raise ImportError("Google Cloud is required for retrieving a dataset from s3")
+
+            bucket = validation_location["bucket"]
+            key = validation_location["key"]
+
+            bucket_instance = client.get_bucket(bucket)
+            blob = bucket_instance.blob(key)
+            downloaded_blob = blob.download_as_string()
+            results_dict = json.loads(downloaded_blob)
+
+            if failed_only:
+                failed_results_list = [result for result in results_dict["results"] if not result["success"]]
+                results_dict["results"] = failed_results_list
+                return results_dict
+            else:
+                return results_dict
+
         else:
             raise DataContextError("Invalid validations_store configuration: only 'filesystem' and 's3' are supported.")
 
@@ -1623,18 +1706,18 @@ class DataContext(object):
     #         reference_url = validation_result["meta"]["dataset_reference"]
     #     except KeyError:
     #         raise ValueError("Validation result must have a dataset_reference in the meta object to fetch")
-        
+
     #     if reference_url.startswith("s3://"):
     #         try:
     #             import boto3
     #             s3 = boto3.client('s3')
     #         except ImportError:
     #             raise ImportError("boto3 is required for retrieving a dataset from s3")
-        
+
     #         parsed_url = urlparse(reference_url)
     #         bucket = parsed_url.netloc
     #         key = parsed_url.path[1:]
-            
+
     #         s3_response_object = s3.get_object(Bucket=bucket, Key=key)
     #         if key.endswith(".csv"):
     #             # Materialize as dataset
@@ -1794,7 +1877,7 @@ class DataContext(object):
                     # FIXME: There needs to be an affordance here to limit to 100 rows, or downsample, etc.
                     if additional_batch_kwargs is None:
                         additional_batch_kwargs = {}
-                        
+
                     batch = self.get_batch(
                         data_asset_name=NormalizedDataAssetName(datasource_name, generator_name, name),
                         expectation_suite_name=profiler.__name__,
@@ -1858,16 +1941,16 @@ class DataContext(object):
         return profiling_results
 
 
-PROJECT_HELP_COMMENT = """# Welcome to great expectations. 
-# This project configuration file allows you to define datasources, 
+PROJECT_HELP_COMMENT = """# Welcome to great expectations.
+# This project configuration file allows you to define datasources,
 # generators, integrations, and other configuration artifacts that
 # make it easier to use Great Expectations.
 
-# For more help configuring great expectations, 
+# For more help configuring great expectations,
 # see the documentation at: https://docs.greatexpectations.io/en/latest/core_concepts/data_context.html#configuration
 
 # NOTE: GE uses the names of configured datasources and generators to manage
-# how expectations and other configuration artifacts are stored in the 
+# how expectations and other configuration artifacts are stored in the
 # expectations/ and datasources/ folders. If you need to rename an existing
 # datasource or generator, be sure to also update the paths for related artifacts.
 
@@ -1897,7 +1980,7 @@ validations_store:
 #     type: s3
 #     bucket: <your bucket>
 #     key_prefix: <your key prefix>
-#   
+#
 
 # Uncomment the lines below to enable a result callback.
 
@@ -1924,8 +2007,8 @@ validations_store:
 data_docs:
   sites:
     local_site: # site name
-    # “local_site” renders documentation for all the datasources in the project from GE artifacts in the local repo. 
-    # The site includes expectation suites and profiling and validation results from uncommitted directory. 
+    # “local_site” renders documentation for all the datasources in the project from GE artifacts in the local repo.
+    # The site includes expectation suites and profiling and validation results from uncommitted directory.
     # Local site provides the convenience of visualizing all the entities stored in JSON files as HTML.
       type: SiteBuilder
       site_store: # where the HTML will be written to (filesystem/S3)
@@ -1972,11 +2055,11 @@ data_docs:
           view:
             module: great_expectations.render.view
             class: DefaultJinjaPageView
-            
+
     team_site:
-      # "team_site" is meant to support the "shared source of truth for a team" use case. 
+      # "team_site" is meant to support the "shared source of truth for a team" use case.
       # By default only the expectations section is enabled.
-      #  Users have to configure the profiling and the validations sections (and the corresponding validations_store and profiling_store attributes based on the team's decisions where these are stored (a local filesystem or S3). 
+      #  Users have to configure the profiling and the validations sections (and the corresponding validations_store and profiling_store attributes based on the team's decisions where these are stored (a local filesystem or S3).
       # Reach out on Slack (https://tinyurl.com/great-expectations-slack>) if you would like to discuss the best way to configure a team site.
       type: SiteBuilder
       site_store:
@@ -2014,13 +2097,13 @@ data_docs:
 PROJECT_TEMPLATE = PROJECT_HELP_COMMENT + "datasources: {}\n" + PROJECT_OPTIONAL_CONFIG_COMMENT
 
 
-PROFILE_COMMENT = """This file stores profiles with database access credentials. 
-Do not commit this file to version control. 
+PROFILE_COMMENT = """This file stores profiles with database access credentials.
+Do not commit this file to version control.
 
-A profile can optionally have a single parameter called 
+A profile can optionally have a single parameter called
 "url" which will be passed to sqlalchemy's create_engine.
 
-Otherwise, all credential options specified here for a 
+Otherwise, all credential options specified here for a
 given profile will be passed to sqlalchemy's create URL function.
 
 """
